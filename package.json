@@ -8,11 +8,18 @@
     "dev": "nodemon app.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": ["pdf", "chat", "llama-index", "ollama", "rag"],
+  "keywords": [
+    "pdf",
+    "chat",
+    "llama-index",
+    "ollama",
+    "rag"
+  ],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@llamaindex/readers": "^3.1.14",
     "axios": "^1.6.7",
     "body-parser": "^1.20.2",
     "cors": "^2.8.5",

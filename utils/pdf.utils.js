@@ -1,13 +1,13 @@
 const fs = require('fs');
 const path = require('path');
-const { PDFLoader } = require('llamaindex');
+const { PDFReader } = require('@llamaindex/readers/pdf');
 const axios = require('axios');
 const PdfChunk = require('../models/pdf.model');
 
 // Function to get embeddings from Ollama
 async function getEmbeddings(text) {
   try {
-    const response = await axios.post(process.env.OLLAMA_API_URL + '/embeddings', {
+    const response = await axios.post(process.env.OLLAMA_API_URL + '/api/embeddings', {
       model: process.env.OLLAMA_EMBEDDING_MODEL,
       prompt: text,
     });
@@ -19,12 +19,38 @@ async function getEmbeddings(text) {
   }
 }
 
+// Function to calculate cosine similarity between two vectors
+function cosineSimilarity(vecA, vecB) {
+  if (vecA.length !== vecB.length) {
+    throw new Error('Vectors must have the same length');
+  }
+  
+  let dotProduct = 0;
+  let normA = 0;
+  let normB = 0;
+  
+  for (let i = 0; i < vecA.length; i++) {
+    dotProduct += vecA[i] * vecB[i];
+    normA += vecA[i] * vecA[i];
+    normB += vecB[i] * vecB[i];
+  }
+  
+  normA = Math.sqrt(normA);
+  normB = Math.sqrt(normB);
+  
+  if (normA === 0 || normB === 0) {
+    return 0;
+  }
+  
+  return dotProduct / (normA * normB);
+}
+
 // Function to process and store PDF
 async function processPdf(filePath, pdfName) {
   try {
     // Load and parse PDF
-    const loader = new PDFLoader(filePath);
-    const documents = await loader.load();
+    const reader = new PDFReader();
+    const documents = await reader.loadData(filePath);
     
     // Process each document (page or section)
     const chunkSize = 1000; // Characters per chunk
@@ -78,38 +104,36 @@ async function processPdf(filePath, pdfName) {
   }
 }
 
-// Function to query PDF chunks using vector search
+// Function to query PDF chunks using manual similarity calculation
 async function queryPdfChunks(question, pdfName) {
   try {
     // Get embedding for question
     const questionEmbedding = await getEmbeddings(question);
     
-    // Query MongoDB for similar chunks using vector search
-    const pipeline = [
-      {
-        $search: {
-          index: "pdf_vector_index", // Make sure this index is created in MongoDB
-          knnBeta: {
-            vector: questionEmbedding,
-            path: "embedding",
-            k: 5
-          }
-        }
-      },
-      {
-        $match: { pdfName: pdfName } // Filter by PDF name
-      },
-      {
-        $project: {
-          text: 1,
-          metadata: 1,
-          score: { $meta: "searchScore" }
-        }
-      }
-    ];
+    // Get all chunks for the specified PDF
+    const chunks = await PdfChunk.find({ pdfName: pdfName });
     
-    const results = await PdfChunk.aggregate(pipeline);
-    return results;
+    if (!chunks || chunks.length === 0) {
+      return [];
+    }
+    
+    // Calculate similarity for each chunk
+    const chunksWithSimilarity = chunks.map(chunk => {
+      const similarity = cosineSimilarity(questionEmbedding, chunk.embedding);
+      return {
+        _id: chunk._id,
+        text: chunk.text,
+        metadata: chunk.metadata,
+        score: similarity
+      };
+    });
+    
+    // Sort by similarity score (descending) and return top 5
+    const topChunks = chunksWithSimilarity
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 5);
+    
+    return topChunks;
   } catch (error) {
     console.error('Error querying PDF chunks:', error);
     throw error;
@@ -130,7 +154,7 @@ async function getAnswerFromOllama(question, context) {
       Answer the question based only on the provided context. If the answer cannot be determined from the context, say "I don't have enough information to answer this question."
     `;
     
-    const response = await axios.post(process.env.OLLAMA_API_URL + '/generate', {
+    const response = await axios.post(process.env.OLLAMA_API_URL + '/api/generate', {
       model: process.env.OLLAMA_COMPLETION_MODEL,
       prompt: prompt,
       stream: false
