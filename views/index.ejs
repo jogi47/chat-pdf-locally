@@ -1,0 +1,42 @@
+<div class="row">
+  <div class="col-md-12">
+    <div class="card mb-4">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Chat with PDF</h5>
+        <div class="pdf-selector">
+          <select class="form-select" id="pdfSelect">
+            <option value="">Select a PDF</option>
+            <!-- PDF options will be loaded dynamically -->
+          </select>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="chat-container" id="chatContainer">
+          <div class="welcome-message">
+            <h4>Welcome to PDF Chat!</h4>
+            <p>Select a PDF from the dropdown above and ask questions about its content.</p>
+            <p>If you haven't uploaded any PDFs yet, go to the <a href="/upload">Upload</a> page.</p>
+          </div>
+          <!-- Chat messages will appear here -->
+        </div>
+        <div class="chat-input-container mt-3">
+          <form id="chatForm" class="d-flex">
+            <input type="text" class="form-control" id="questionInput" placeholder="Ask a question about the PDF..." disabled>
+            <button type="submit" class="btn btn-primary ms-2" id="sendButton" disabled>
+              <i class="bi bi-send"></i>
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    loadPdfNames();
+    
+    // Set the chat link as active
+    document.getElementById('chat-link').classList.add('active');
+  });
+</script> 
